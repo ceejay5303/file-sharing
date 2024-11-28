@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure File Sharing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input[type="file"] {
+            width: 100%;
+        }
+
+        .form-group button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .form-group button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Secure File Sharing Application</h1>
+        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Select File:</label>
+                <input type="file" name="file" id="file" required>
+            </div>
+            <input type="hidden" name="client_key" id="clientKey">
+            <div class="form-group">
+                <button type="submit">Upload and Encrypt</button>
+            </div>
+        </form>
+    </div>
+    <script>
+        async function generateKeys() {
+            const keyPair = await window.crypto.subtle.generateKey(
+                {
+                    name: "ECDH",
+                    namedCurve: "P-256"
+                },
+                true,
+                ["deriveKey", "deriveBits"]
+            );
+
+            // Export the public key in PEM format
+            const publicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+            const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${btoa(String.fromCharCode(...new Uint8Array(publicKey))).match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----`;
+
+            // Save private key to session storage for decryption later
+            const privateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+            sessionStorage.setItem("privateKey", btoa(String.fromCharCode(...new Uint8Array(privateKey))));
+
+            return publicKeyPem;
+        }
+
+        // Attach event listener to the form to inject the public key before submitting
+        document.getElementById("uploadForm").addEventListener("submit", async (event) => {
+            event.preventDefault(); // Prevent immediate form submission
+
+            const clientKey = await generateKeys();
+            document.getElementById("clientKey").value = clientKey;
+
+            // Submit the form after the key is generated and injected
+            event.target.submit();
+        });
+    </script>
+</body>
+</html>
